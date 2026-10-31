@@ -1,3 +1,31 @@
+# Entrega ARSW-EQP-03 · Persistencia, consistencia y observabilidad
+
+Integrantes: Sara Arteaga, Johan Beltrán y Julián Tinjacá
+
+Este repositorio contiene nuestra solución al laboratorio de persistencia y consistencia de Arquitecturas de Software. El objetivo fue decidir qué motor de datos usar para cada tipo de información de un tablero colaborativo y comprobar con pruebas y métricas que la arquitectura cumple lo que promete, no solo que responde rápido.
+
+Trabajamos con PostgreSQL para los permisos, MongoDB para el contenido del tablero y Redis para la presencia y una caché de permisos, todo sobre Docker Compose y observado con Prometheus, Grafana y k6. Partimos de un código que tenía tres defectos: se podían perder ediciones cuando dos personas guardaban al mismo tiempo, un usuario revocado podía seguir escribiendo gracias a la caché y la presencia nunca expiraba.
+
+Lo que hicimos:
+
+- Implementamos control optimista de versiones en MongoDB, de modo que de dos ediciones con la misma versión solo una se guarda y la otra recibe 409.
+- Hicimos que las escrituras siempre validen el permiso contra Gestión y PostgreSQL. Un usuario revocado recibe 403 y si Gestión no responde se devuelve 503 sin guardar.
+- Registramos la presencia con una expiración de 20 segundos y, si Redis se cae, la presencia se degrada sin afectar la edición del tablero.
+- Probamos fallos controlados apagando Redis y Gestión, medimos carga con k6 y armamos un dashboard en Grafana con ocho paneles más uno opcional.
+
+Dónde está cada cosa:
+
+- Código modificado: services/content/decisions.py
+- Matriz de decisiones: entrega/MATRIZ.md
+- ADR: entrega/ADR-001.md
+- Registro de evidencias y respuestas de observabilidad: entrega/EVIDENCIAS.md
+- Dashboard exportado: entrega/dashboard.json
+- Resultados de pruebas y capturas: entrega/evidencias
+
+Para reproducirlo basta con levantar el entorno con docker compose up -d --build --wait y correr docker compose run --rm tools acceptance. Abajo se conserva el enunciado original del laboratorio.
+
+---
+
 # ARSW · Laboratorio de persistencia, consistencia y observabilidad
 
 **Escuela Colombiana de Ingeniería Julio Garavito**  
