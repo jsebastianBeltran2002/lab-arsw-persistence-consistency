@@ -1,4 +1,4 @@
-# Evidencias · ARSW-EQP-__
+# Evidencias · ARSW-EQP-03
 
 ## Entorno
 macOS 26.6.2 · Apple M5 (10 núcleos disponibles para Docker) · 16 GB RAM en el equipo, **~7,75 GB asignados a Docker** · Docker Engine 29.6.1 · Docker Compose v5.3.0.
@@ -20,7 +20,7 @@ Todas las horas son del 2026-10-31 en **UTC** (hora local Colombia = UTC−5; en
 | Carga k6 (solución) | 12:53:26 – 12:55:07 | `evidencias/k6-carga-summary-solucion.json` (puntos crudos generados en `results/k6-carga-points.json`, no versionados por tamaño) | 1 979 req, 19,8 req/s, **P95 9,25 ms**, 0 % fallos, 0 errores semánticos, umbrales OK | Sin diferencia apreciable: k6 solo lee y los cambios afectan escrituras/presencia. El costo de la validación autoritativa (una llamada HTTP extra por PUT) **no** lo mide esta carga |
 
 ## Observabilidad
-Dashboard **ARSW-EQP-XX · Persistencia** (uid `arsw-eqp-persistencia`, carpeta ARSW) con los 2 paneles iniciales + 6 requeridos + 1 opcional (respuestas por código). Exportado en `entrega/dashboard.json`; captura con ventana "Last 30 minutes" en `evidencias/grafana-dashboard.png`. Targets en `evidencias/prometheus-targets.png`.
+Dashboard **ARSW-EQP-03 · Persistencia** (uid `arsw-eqp-persistencia`, carpeta ARSW) con los 2 paneles iniciales + 6 requeridos + 1 opcional (respuestas por código). Exportado en `entrega/dashboard.json`; captura con ventana "Last 45 minutes" (título del dashboard visible) en `evidencias/grafana-dashboard.png`. Targets en `evidencias/prometheus-targets.png`.
 
 Lectura del dashboard: las dos campanas de ~24 req/s son las dos cargas k6 (07:49–07:51 y 07:53–07:55 locales). El P95 del backend durante la carga ronda 5–25 ms (pico aislado ~180 ms al arrancar, con pocos datos en la ventana de 1 m). *Dependencias* muestra Redis en rojo dos veces (prueba base y prueba corregida). *Conflictos* tiene picos en cada acceptance y en el experimento de pestañas; *Presencia degradada* sube solo durante Redis caído corregido (en la base respondía 503 y no contaba). *Errores 5xx* queda prácticamente en 0: el único 503 de content fue el intencional de autoridad caída.
 
@@ -36,4 +36,3 @@ Lectura del dashboard: las dos campanas de ~24 req/s son las dos cargas k6 (07:4
 - No se resolvió (por diseño del laboratorio) la carrera entre validar permiso y escribir: ver ADR, sección Consecuencias.
 - En el panel *Dependencias* la caída de Gestión (≈8–10 s) no se ve claramente: el sondeo corre cada 5 s y Prometheus muestrea con su intervalo, por lo que paradas tan cortas pueden no quedar registradas. La evidencia de ese experimento es el JSON de `authority-down`.
 - Las pruebas opcionales de estrés, pico y resistencia no se ejecutaron.
-- El número de equipo y los integrantes deben completarse en los tres archivos y en el título del dashboard.

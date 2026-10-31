@@ -1,6 +1,6 @@
-# Matriz de decisiones · ARSW-EQP-__
+# Matriz de decisiones · ARSW-EQP-03
 
-Integrantes: _(completar)_
+Integrantes: Sara Arteaga, Johan Beltrán, Julián Tinjacá
 
 | Dato | Motor elegido | Consulta principal | Qué debe ser atómico | Atraso tolerable | Retención / TTL | Consecuencia de perderlo | Alternativa y costo |
 |---|---|---|---|---|---|---|---|
