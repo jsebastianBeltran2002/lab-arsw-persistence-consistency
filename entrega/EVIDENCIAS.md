@@ -1,20 +1,39 @@
 # Evidencias · ARSW-EQP-__
 
 ## Entorno
-Sistema operativo / CPU / RAM asignada a Docker / versiones Docker y Compose:
+macOS 26.6.2 · Apple M5 (10 núcleos disponibles para Docker) · 16 GB RAM en el equipo, **~7,75 GB asignados a Docker** · Docker Engine 29.6.1 · Docker Compose v5.3.0.
+Todas las horas son del 2026-10-31 en **UTC** (hora local Colombia = UTC−5; en las capturas de Grafana el eje está en hora local, p. ej. 12:50 UTC = 07:50).
 
 ## Registro
-| Experimento | Inicio / fin y zona horaria | Archivo / captura | Resultado observado | Interpretación |
+| Experimento | Inicio / fin (UTC) | Archivo / captura | Resultado observado | Interpretación |
 |---|---|---|---|---|
-| Baseline | | | | |
-| Restricciones SQL y rollback | | | | |
-| Acceptance corregido | | | | |
-| Redis detenido y recuperación | | | | |
-| Autoridad detenida y recuperación | | | | |
-| Carga k6 | | | | |
+| Smoke | 12:48:15 | `evidencias/smoke-20261031T124815012825Z.json` | `arranque passed:true`, versión 1 | Stack arriba, frontend → APIs OK |
+| Baseline (código sin corregir) | 12:48:24 – 12:48:47 | `evidencias/baseline-20261031T124847048088Z.json` | ediciones concurrentes: **[200, 200]**, versión 1→**3**, título "Cambio de luis" · revocado: **200**, documento cambiado a "Cambio prohibido" · presencia tras 22 s: **sigue "ana"** | Tres defectos: *lost update* (dos escrituras sin condición de versión), autorización con caché de 60 s, clave de presencia sin TTL |
+| Redis detenido (base) | 12:48:52 – 12:48:53 | `evidencias/redis-down-BASE-20261031T124853Z.json` | edición 200, presencia **503** | La capacidad opcional tumbaba el endpoint en vez de degradar |
+| Autoridad detenida (base) | 12:49:00 – 12:49:01 | `evidencias/authority-down-BASE-20261031T124900Z.json` | edición **200** con Gestión caída | La caché ocultaba la falla de la autoridad: escritura aceptada sin poder validar permiso |
+| Restricciones SQL y rollback | 12:48:21 | `evidencias/sql-restricciones.txt`, `evidencias/inspeccion-datos.txt` | Revocación dentro de transacción `can_edit=f` → tras `ROLLBACK` vuelve a `t`. `ERROR duplicate key ... memberships_pkey` para (board-1, ana). `ERROR ... violates foreign key memberships_user_id_fkey` para usuario-inexistente | **PK compuesta**: no pueden existir dos membresías contradictorias para el mismo usuario/tablero. **FK**: no hay membresías de usuarios/tableros inexistentes. **Transacción**: un cambio de permiso no confirmado nunca se observa; se aplica entero o nada |
+| Experimento 1 · dos pestañas | 12:51:52 (curl) y ~13:00 (navegador) | `evidencias/experimento1-dos-pestanas.txt`, `evidencias/exp1-pestana1-200.png`, `evidencias/exp1-pestana2-409.png` | Ambas leen versión 1; pestaña Ana → **200** (versión 2); pestaña Luis → **409** "Versión obsoleta… recargue"; estado final conserva la edición de Ana, versión 2 | El 409 es un **rechazo de negocio** correcto (4xx): el servidor funciona y protege la edición ya guardada. No es un 5xx ni una caída |
+| Acceptance corregido | 12:51:20 – 12:51:42 y 12:52:58 – 12:53:20 | `evidencias/acceptance-20261031T125142813562Z.json`, `evidencias/acceptance-20261031T125320621329Z.json` | 4/4 `passed:true`, **código de salida 0**: [200, 409] y versión +1; revocado **403** con caché `can_edit:true`, versión intacta 1; presencia vacía tras 22 s | TODO 1, 2 y 3 cumplen los contratos de `docs/CONTRATOS.md` |
+| Redis detenido y recuperación | 12:51:52 – 12:52:25 | `evidencias/redis-down-20261031T125205085504Z.json`, panel *Dependencias* y *Presencia degradada* | `passed:true`: edición **200**, presencia **200** `{"available":false,"ttl_seconds":null}`; 10 heartbeats adicionales degradados; `redis-cli ping` → PONG tras `start`; acceptance posterior OK | Degradación controlada: presencia no disponible, contenido sigue funcionando. `lab_dependency_up{dependency="redis"}` bajó a 0 mientras `up` de los servicios seguía en 1 |
+| Autoridad detenida y recuperación | 12:52:40 – 12:52:50 | `evidencias/authority-down-20261031T125249389900Z.json` | Permiso de Ana primado en caché (clave `permission:board-1:ana` presente); edición → **503** "No se puede validar el permiso; escritura no autorizada"; mientras tanto `GET /permissions` seguía devolviendo `can_edit:true` desde caché. Gestión reiniciada (healthy) y acceptance final OK | Indisponibilidad **deliberada** de escritura (*fail-closed*): sin fuente autoritativa no se acepta una concesión vieja. La caché sirve a la UI, no autoriza |
+| Carga k6 (base) | 12:49:14 – 12:51:03 | `evidencias/k6-carga-summary-base.json` | 1 976 req, 19,7 req/s, **P95 9,34 ms**, 0 % fallos, 0 errores semánticos, umbrales OK | Línea base de lecturas |
+| Carga k6 (solución) | 12:53:26 – 12:55:07 | `evidencias/k6-carga-summary-solucion.json` (puntos crudos generados en `results/k6-carga-points.json`, no versionados por tamaño) | 1 979 req, 19,8 req/s, **P95 9,25 ms**, 0 % fallos, 0 errores semánticos, umbrales OK | Sin diferencia apreciable: k6 solo lee y los cambios afectan escrituras/presencia. El costo de la validación autoritativa (una llamada HTTP extra por PUT) **no** lo mide esta carga |
 
 ## Observabilidad
-Responda las cuatro preguntas de docs/OBSERVABILIDAD.md. Incluya dashboard.json.
+Dashboard **ARSW-EQP-XX · Persistencia** (uid `arsw-eqp-persistencia`, carpeta ARSW) con los 2 paneles iniciales + 6 requeridos + 1 opcional (respuestas por código). Exportado en `entrega/dashboard.json`; captura con ventana "Last 30 minutes" en `evidencias/grafana-dashboard.png`. Targets en `evidencias/prometheus-targets.png`.
+
+Lectura del dashboard: las dos campanas de ~24 req/s son las dos cargas k6 (07:49–07:51 y 07:53–07:55 locales). El P95 del backend durante la carga ronda 5–25 ms (pico aislado ~180 ms al arrancar, con pocos datos en la ventana de 1 m). *Dependencias* muestra Redis en rojo dos veces (prueba base y prueba corregida). *Conflictos* tiene picos en cada acceptance y en el experimento de pestañas; *Presencia degradada* sube solo durante Redis caído corregido (en la base respondía 503 y no contaba). *Errores 5xx* queda prácticamente en 0: el único 503 de content fue el intencional de autoridad caída.
+
+**¿Por qué puede subir el contador de conflictos mientras baja la pérdida de cambios?** Porque cada conflicto es justamente una pérdida evitada. En la base, la segunda escritura sobrescribía en silencio (dos 200, contador en 0, cambio perdido). Con control optimista, la escritura obsoleta se rechaza con 409 y se cuenta en `lab_conflicts_total`. Más conflictos bajo concurrencia significa que el sistema detecta lo que antes ocultaba.
+
+**¿Por qué el panel de caché no demuestra que una escritura fue autorizada correctamente?** La métrica `lab_cache_total` solo cuenta hits/misses de la consulta de permisos para la UI. Ahora la escritura no pasa por la caché: consulta a Gestión. Un 100 % de aciertos podría estar sirviendo una concesión ya revocada (lo vimos: con Gestión caída la caché seguía diciendo `can_edit:true`). La corrección de la autorización se demuestra con los escenarios de acceptance (403 tras revocar, 503 sin autoridad), no con una tasa de aciertos.
+
+**¿Qué ve Grafana cuando Redis cae, pero la API sigue contestando 200?** `up{job="content"}` sigue en 1 (Prometheus logra hacer scrape de `/metrics`), solicitudes/s y 5xx no cambian, pero `lab_dependency_up{service="content",dependency="redis"}` pasa a 0 y `lab_degraded_total{feature="presence"}` sube: respuestas 200 con `available:false`. Es decir, la disponibilidad técnica se mantiene y la funcional queda reducida; solo los paneles de dependencia y degradación lo muestran.
+
+**¿Por qué el P95 de k6 y el P95 del backend no tienen necesariamente el mismo valor?** k6 mide el recorrido completo del cliente (red Docker, Nginx como proxy, serialización, cola) por cada solicitud exacta, y calcula el percentil sobre todas las muestras de la prueba. El backend mide solo el procesamiento dentro de FastAPI y Prometheus *estima* el P95 interpolando buckets de histograma sobre ventanas de 1 m (`rate[1m]`), mezclando también otras solicitudes (sondeos, pruebas). Distinto alcance, distinta ventana y distinta precisión.
 
 ## Problemas pendientes
-Describa fallos no resueltos y evidencia. No sustituya resultados reales por resultados esperados.
+- No se resolvió (por diseño del laboratorio) la carrera entre validar permiso y escribir: ver ADR, sección Consecuencias.
+- En el panel *Dependencias* la caída de Gestión (≈8–10 s) no se ve claramente: el sondeo corre cada 5 s y Prometheus muestrea con su intervalo, por lo que paradas tan cortas pueden no quedar registradas. La evidencia de ese experimento es el JSON de `authority-down`.
+- Las pruebas opcionales de estrés, pico y resistencia no se ejecutaron.
+- El número de equipo y los integrantes deben completarse en los tres archivos y en el título del dashboard.

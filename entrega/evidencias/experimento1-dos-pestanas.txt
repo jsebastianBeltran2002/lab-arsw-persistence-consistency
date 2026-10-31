@@ -1,0 +1,10 @@
+# Experimento 1 · dos clientes con la misma versión (2026-10-31T12:51:52Z)
+version leida por ambos: 1
+--- pestaña 1 (ana)
+{"id":"board-1","title":"Pestaña Ana","version":2,"preferences":{"background":"white"}}
+HTTP 200
+--- pestaña 2 (luis)
+{"detail":"Versión obsoleta o tablero inexistente: recargue antes de editar"}
+HTTP 409
+--- estado final
+{"id":"board-1","title":"Pestaña Ana","version":2,"preferences":{"background":"white"}}
